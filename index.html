@@ -49,6 +49,16 @@
   }
   .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); opacity: .5; }
 
+  .shop { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .shoplabel { font-size: 13px; color: var(--muted); }
+  .shop select {
+    flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); outline: none; font-weight: 600;
+  }
+  .card.away { opacity: .55; }
+  .card .away-note { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #B3261E; }
+  .nohere { border: 0; background: var(--line); color: var(--muted); font-weight: 600; padding: 8px 13px; border-radius: 99px; font-size: 14px; }
+
   .sections { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 99px; padding: 3px; margin-bottom: 10px; }
   .sections button { border: 0; background: none; padding: 7px 18px; border-radius: 99px; cursor: pointer; color: var(--muted); font-weight: 500; }
   .sections button[aria-pressed=true] { background: var(--brand); color: #fff; font-weight: 600; }
@@ -74,6 +84,12 @@
   .card p { margin: 0; font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .card .row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto; padding-top: 10px; }
   .card .price { font-weight: 700; white-space: nowrap; }
+  .card .left { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #C2703B; }
+  .limit {
+    position: fixed; left: 16px; right: 16px; bottom: calc(96px + var(--safe-bottom)); z-index: 7;
+    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px;
+    font-size: 14px; text-align: center;
+  }
 
   .add {
     border: 0; background: var(--brand); color: #fff; font-weight: 600;
@@ -170,6 +186,10 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input type="search" id="search" placeholder="Найти товар" aria-label="Поиск">
     </div>
+    <div class="shop" id="shopPicker">
+      <span class="shoplabel">Магазин</span>
+      <select id="shopSelect" aria-label="Выберите магазин"></select>
+    </div>
     <div class="sections" id="sections" role="group"></div>
     <div class="chips" id="chips"></div>
   </header>
@@ -203,10 +223,7 @@
     <label><input type="radio" name="delivery" value="Доставка">Доставка<small id="deliveryHint"></small></label>
   </div>
 
-  <div class="field" id="pickupField">
-    <label>Где заберёте заказ</label>
-    <div id="pickupList"></div>
-  </div>
+  <div class="info" id="shopInfo"></div>
 
   <div class="warn hidden" id="minWarn"></div>
 
@@ -247,6 +264,8 @@
   <p>Оператор свяжется с вами, чтобы подтвердить заказ и рассчитать доставку.</p>
 </div>
 
+<div class="limit hidden" id="limitNote" role="status"></div>
+
 <!-- НИЖНЯЯ КНОПКА -->
 <div class="bar hidden" id="bar">
   <button class="bigbtn" id="mainBtn" type="button"></button>
@@ -259,7 +278,8 @@
     SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxTU34cuN7pZRU6SdEXWJZHf89OnYIsT53UxLAwOwMMPYoPpqkw6tRwrLX9ZdkO6KHu/exec',
     // Минимальная сумма заказа на доставку, в рублях
     MIN_DELIVERY: 1000,
-    // Точки самовывоза. Добавляйте или убирайте строки по образцу.
+    // Точки самовывоза берутся из листа «Точки» вашей таблицы.
+    // Этот список — запасной, на случай если лист пуст.
     PICKUP_POINTS: [
       {
         name: 'На Видной',
@@ -279,7 +299,7 @@
   // =========================================================
 
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var S = { categories: [], products: [], section: '', category: '', cart: {}, view: 'shop', sending: false };
+  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false };
   var $ = function (id) { return document.getElementById(id); };
   var rub = function (n) { return n.toLocaleString('ru-RU') + ' ₽'; };
 
@@ -303,6 +323,9 @@
         if (!data || !data.products) throw new Error('bad');
         S.categories = data.categories || [];
         S.products = data.products || [];
+        S.points = (data.points && data.points.length) ? data.points : CONFIG.PICKUP_POINTS;
+        S.shop = savedShop();
+        renderShops();
         $('loading').classList.add('hidden');
         var sections = ['Пекарня', 'Маркет'].filter(function (sec) {
           return S.categories.some(function (c) { return c.section === sec && hasProducts(c.name); });
@@ -315,6 +338,61 @@
       .catch(function () {
         showError('Не получилось загрузить каталог. Проверьте связь и попробуйте ещё раз.');
       });
+  }
+
+  function savedShop() {
+    var saved = '';
+    try { saved = localStorage.getItem('mv_shop') || ''; } catch (e) {}
+    var known = S.points.filter(function (p) { return p.name === saved; }).length > 0;
+    return known ? saved : (S.points[0] ? S.points[0].name : '');
+  }
+
+  function renderShops() {
+    var picker = $('shopPicker'), select = $('shopSelect');
+    if (S.points.length < 2) { picker.classList.add('hidden'); return; }
+    picker.classList.remove('hidden');
+    select.innerHTML = '';
+    S.points.forEach(function (point) {
+      var o = document.createElement('option');
+      o.value = point.name;
+      o.textContent = point.name + (point.hours ? ' · ' + point.hours : '');
+      select.appendChild(o);
+    });
+    select.value = S.shop;
+    select.onchange = function () { changeShop(select.value); };
+  }
+
+  // Заказ собирается в одном магазине: при смене убираем то, чего там нет
+  function changeShop(name) {
+    var lost = cartList().filter(function (i) { return !availableAt(productById(i.id), name); });
+    if (lost.length) {
+      var names = lost.map(function (i) { return '«' + i.name + '»'; }).join(', ');
+      if (!confirm('В этом магазине нет: ' + names + '. Убрать из корзины и переключиться?')) {
+        $('shopSelect').value = S.shop;
+        return;
+      }
+      lost.forEach(function (i) { delete S.cart[i.id]; });
+      saveCart();
+    }
+    S.shop = name;
+    try { localStorage.setItem('mv_shop', name); } catch (e) {}
+    S.category = '';
+    renderChips();
+    render();
+  }
+
+  function productById(id) {
+    return S.products.filter(function (p) { return p.id === id; })[0] || { points: [] };
+  }
+
+  // Пустой список точек у товара означает «есть везде»
+  function availableAt(product, shop) {
+    if (!product || !product.points || !product.points.length) return true;
+    return product.points.indexOf(shop) !== -1;
+  }
+
+  function whereElse(product) {
+    return (product.points || []).join(', ');
   }
 
   function hasProducts(category) {
@@ -387,7 +465,11 @@
   }
 
   function render() {
-    var items = visibleProducts();
+    var all = visibleProducts();
+    var here = all.filter(function (p) { return availableAt(p, S.shop); });
+    var away = all.filter(function (p) { return !availableAt(p, S.shop); });
+    var items = here.concat(away);
+
     var grid = $('grid');
     grid.innerHTML = '';
     items.forEach(function (p) { grid.appendChild(cardFor(p)); });
@@ -408,8 +490,9 @@
   }
 
   function cardFor(p) {
+    var here = availableAt(p, S.shop);
     var card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (here ? '' : ' away');
 
     var ph = document.createElement('div');
     ph.className = 'ph';
@@ -430,11 +513,37 @@
       var d = document.createElement('p'); d.textContent = p.description; body.appendChild(d);
     }
 
+    if (p.quantity !== null && p.quantity !== undefined && p.quantity <= 5) {
+      var left = document.createElement('p');
+      left.className = 'left';
+      left.textContent = 'осталось ' + p.quantity + ' шт.';
+      body.appendChild(left);
+    }
+
     var row = document.createElement('div');
     row.className = 'row';
     var price = document.createElement('div'); price.className = 'price'; price.textContent = rub(p.price);
+    if (!here) {
+      var note = document.createElement('p');
+      note.className = 'away-note';
+      note.textContent = 'Только в: ' + whereElse(p);
+      body.appendChild(note);
+    }
+
     row.appendChild(price);
-    row.appendChild(controlFor(p));
+    if (here) {
+      row.appendChild(controlFor(p));
+    } else {
+      var off = document.createElement('button');
+      off.className = 'nohere'; off.type = 'button'; off.textContent = 'Нет здесь';
+      off.onclick = function () {
+        if (confirm('«' + p.name + '» есть в: ' + whereElse(p) + '. Переключиться на этот магазин?')) {
+          changeShop(p.points[0]);
+          $('shopSelect').value = S.shop;
+        }
+      };
+      row.appendChild(off);
+    }
     body.appendChild(row);
 
     card.appendChild(ph); card.appendChild(body);
@@ -462,12 +571,29 @@
     return box;
   }
 
+  function maxQty(p) {
+    return (p.quantity === null || p.quantity === undefined) ? 99 : Math.min(99, p.quantity);
+  }
+
   function setQty(p, qty) {
     haptic();
+    var limit = maxQty(p);
+    if (qty > limit) {
+      qty = limit;
+      toastLimit(p);
+    }
     if (qty <= 0) delete S.cart[p.id];
     else S.cart[p.id] = { id: p.id, name: p.name, price: p.price, photo: p.photo, qty: qty };
     saveCart();
     if (S.view === 'shop') render(); else renderCart();
+  }
+
+  function toastLimit(p) {
+    var note = $('limitNote');
+    note.textContent = 'Больше нет: «' + p.name + '» осталось ' + maxQty(p) + ' шт.';
+    note.classList.remove('hidden');
+    clearTimeout(toastLimit.timer);
+    toastLimit.timer = setTimeout(function () { note.classList.add('hidden'); }, 2600);
   }
 
   // ---------- Корзина ----------
@@ -567,31 +693,17 @@
     return s;
   }
 
-  function renderPickupPoints() {
-    var box = $('pickupList');
-    box.className = 'points';
-    box.innerHTML = '';
-    CONFIG.PICKUP_POINTS.forEach(function (point, i) {
-      var label = document.createElement('label');
-      var input = document.createElement('input');
-      input.type = 'radio'; input.name = 'pickup'; input.value = i;
-      if (i === 0) input.checked = true;
-      var name = document.createElement('div');
-      name.className = 'pname';
-      name.textContent = point.name + (point.hours ? ' · ' + point.hours : '');
-      var addr = document.createElement('div');
-      addr.className = 'paddr'; addr.textContent = point.address;
-      label.appendChild(input); label.appendChild(name); label.appendChild(addr);
-      box.appendChild(label);
-    });
-    // одна точка — выбирать нечего, просто показываем адрес
-    $('pickupField').classList.toggle('hidden', CONFIG.PICKUP_POINTS.length < 2);
+  function selectedPickup() {
+    return S.points.filter(function (p) { return p.name === S.shop; })[0] || S.points[0];
   }
 
-  function selectedPickup() {
-    var checked = document.querySelector('input[name=pickup]:checked');
-    var index = checked ? Number(checked.value) : 0;
-    return CONFIG.PICKUP_POINTS[index] || CONFIG.PICKUP_POINTS[0];
+  function renderShopInfo() {
+    var point = selectedPickup();
+    if (!point) { $('shopInfo').classList.add('hidden'); return; }
+    $('shopInfo').classList.remove('hidden');
+    $('shopInfo').textContent = selectedDelivery() === 'Самовывоз'
+      ? 'Забрать: ' + point.name + ' · ' + point.address + (point.hours ? ' · ' + point.hours : '')
+      : 'Заказ соберут в магазине: ' + point.name + '. Товары из разных магазинов в один заказ пока не объединяются.';
   }
 
   function selectedDelivery() {
@@ -602,7 +714,7 @@
   function updateDeliveryUI() {
     var delivery = selectedDelivery();
     $('addressField').classList.toggle('hidden', delivery !== 'Доставка');
-    $('pickupField').classList.toggle('hidden', delivery !== 'Самовывоз' || CONFIG.PICKUP_POINTS.length < 2);
+    renderShopInfo();
 
     var warn = $('minWarn');
     if (delivery === 'Доставка' && cartTotal() < CONFIG.MIN_DELIVERY) {
@@ -647,7 +759,7 @@
         username: user && user.username ? '@' + user.username : '',
         phone: phone,
         address: delivery === 'Доставка' ? address : pickupText(),
-        delivery: delivery,
+        delivery: deliveryText(),
         comment: comment.join('. ')
       })
     })
@@ -671,6 +783,15 @@
     return point ? point.name + ', ' + point.address : '';
   }
 
+  // в заказ уходит и магазин, из которого его собирать
+  function deliveryText() {
+    var point = selectedPickup();
+    var shop = point ? point.name : '';
+    return selectedDelivery() === 'Самовывоз'
+      ? 'Самовывоз: ' + shop
+      : 'Доставка из магазина: ' + shop;
+  }
+
   function fail(message, focusId) {
     var err = $('formError');
     err.textContent = message;
@@ -683,7 +804,7 @@
 
   function headerHours() {
     if (CONFIG.HOURS) return CONFIG.HOURS;
-    var hours = CONFIG.PICKUP_POINTS
+    var hours = (S.points.length ? S.points : CONFIG.PICKUP_POINTS)
       .map(function (p) { return p.hours; })
       .filter(Boolean);
     var unique = hours.filter(function (h, i) { return hours.indexOf(h) === i; });
@@ -694,10 +815,7 @@
 
   // ---------- Запуск ----------
   $('hours').textContent = headerHours();
-  $('pickupHint').textContent = CONFIG.PICKUP_POINTS.length > 1
-    ? CONFIG.PICKUP_POINTS.length + ' точки на выбор'
-    : (CONFIG.PICKUP_POINTS[0] ? CONFIG.PICKUP_POINTS[0].address : '');
-  renderPickupPoints();
+  $('pickupHint').textContent = 'из выбранного магазина';
   $('deliveryHint').textContent = 'от ' + rub(CONFIG.MIN_DELIVERY);
   $('search').addEventListener('input', render);
   $('backFromCart').addEventListener('click', function () { showView('shop'); });
