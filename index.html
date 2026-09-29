@@ -61,10 +61,19 @@
   }
   .card.away { opacity: .55; }
   .card .away-note { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #B3261E; }
+  .card .transfer-note {
+    margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #2F6FB0;
+    display: block; overflow: visible; -webkit-line-clamp: none;
+  }
+  .card .ribbon.transfer { background: #2F6FB0; }
   .nohere { border: 0; background: var(--line); color: var(--muted); font-weight: 600; padding: 8px 13px; border-radius: 99px; font-size: 14px; }
 
-  .sections { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 99px; padding: 3px; margin-bottom: 10px; }
-  .sections button { border: 0; background: none; padding: 7px 18px; border-radius: 99px; cursor: pointer; color: var(--muted); font-weight: 500; }
+  .sections {
+    display: flex; gap: 2px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 99px; padding: 3px; margin-bottom: 10px; overflow-x: auto; scrollbar-width: none;
+  }
+  .sections::-webkit-scrollbar { display: none; }
+  .sections button { flex: 0 0 auto; border: 0; background: none; padding: 7px 16px; border-radius: 99px; cursor: pointer; color: var(--muted); font-weight: 500; white-space: nowrap; }
   .sections button[aria-pressed=true] { background: var(--brand); color: #fff; font-weight: 600; }
 
   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
@@ -80,6 +89,12 @@
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   @media (min-width: 560px) { .grid { grid-template-columns: repeat(3, 1fr); } }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .card { position: relative; }
+  .card .ribbon {
+    position: absolute; top: 8px; left: 8px; z-index: 1;
+    background: var(--brand); color: #fff; font-size: 11px; font-weight: 700;
+    padding: 4px 9px; border-radius: 99px; letter-spacing: .01em;
+  }
   .card .ph { aspect-ratio: 1; background: color-mix(in srgb, var(--brand) 8%, var(--card)); display: grid; place-items: center; overflow: hidden; }
   .card .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .card .ph span { font-size: 30px; opacity: .5; }
@@ -89,6 +104,37 @@
   .card .row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto; padding-top: 10px; }
   .card .price { font-weight: 700; white-space: nowrap; }
   .card .left { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #C2703B; }
+  .modal {
+    position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modalbox {
+    background: var(--card); border-radius: 20px; padding: 24px 20px;
+    max-width: 340px; width: 100%; text-align: center;
+  }
+  .modalbox h2 { font-size: 19px; margin: 0 0 8px; }
+  .modalbox p { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .modalbox .bigbtn { justify-content: center; margin-bottom: 8px; }
+  .agemark {
+    width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%;
+    background: color-mix(in srgb, var(--danger) 14%, var(--card)); color: var(--danger);
+    display: grid; place-items: center; font-weight: 800; font-size: 17px;
+  }
+  .ghostbtn {
+    width: 100%; border: 1px solid var(--line); background: none; color: var(--muted);
+    border-radius: 14px; padding: 13px; font-size: 15px; cursor: pointer;
+  }
+  .card .adult {
+    position: absolute; top: 8px; right: 8px; z-index: 1;
+    background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+    padding: 3px 8px; border-radius: 99px;
+  }
+  .adultnote {
+    background: color-mix(in srgb, var(--danger) 10%, var(--card));
+    color: var(--danger); border-radius: 12px; padding: 12px 14px;
+    font-size: 14px; margin-bottom: 16px; font-weight: 500;
+  }
+
   .limit {
     position: fixed; left: 16px; right: 16px; bottom: calc(96px + var(--safe-bottom)); z-index: 7;
     background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px;
@@ -168,6 +214,13 @@
   .field textarea { min-height: 76px; resize: vertical; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
   .warn { color: var(--danger); font-size: 14px; margin-bottom: 12px; }
+  .consent {
+    display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px;
+    font-size: 13px; color: var(--muted); cursor: pointer; line-height: 1.35;
+  }
+  .consent input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--brand); }
+  .consent a { color: var(--brand-dark); }
+
   .info { background: color-mix(in srgb, var(--brand) 10%, var(--card)); border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-bottom: 16px; }
 
   .done { text-align: center; padding: 60px 24px; }
@@ -261,7 +314,17 @@
     <textarea id="fcomment" placeholder="Пожелания к заказу"></textarea>
   </div>
 
+  <div class="info hidden" id="transferNote"></div>
+
+  <div class="adultnote hidden" id="adultNote">В заказе есть товары 18+. Приготовьте документ: продавец проверит возраст при выдаче, иначе эти позиции придётся исключить.</div>
+
   <div class="info">Оплата и стоимость доставки — по договорённости: после заказа с вами свяжется оператор.</div>
+
+  <label class="consent" id="consentRow">
+    <input type="checkbox" id="consent">
+    <span id="consentText"></span>
+  </label>
+
   <div class="warn hidden" id="formError"></div>
 </div>
 
@@ -275,6 +338,16 @@
 </div>
 
 <div class="limit hidden" id="limitNote" role="status"></div>
+
+<div class="modal hidden" id="ageGate" role="dialog" aria-modal="true" aria-labelledby="ageTitle">
+  <div class="modalbox">
+    <div class="agemark">18+</div>
+    <h2 id="ageTitle">Подтвердите возраст</h2>
+    <p>В этом разделе товары, которые по закону продаются только совершеннолетним. Продавец проверит документ при выдаче заказа.</p>
+    <button class="bigbtn" id="ageYes" type="button">Мне есть 18 лет</button>
+    <button class="ghostbtn" id="ageNo" type="button">Мне нет 18 лет</button>
+  </div>
+</div>
 
 <!-- НИЖНЯЯ КНОПКА -->
 <div class="bar hidden" id="bar">
@@ -302,6 +375,14 @@
         hours: '8:30–22:30'
       }
     ],
+    // Ссылка на вашу политику конфиденциальности (страница на Тильде).
+    // Пусто — галочка останется, но без ссылки.
+    PRIVACY_URL: 'https://magitast.github.io/magia-vkusa/privacy.html',
+
+    // Раздел, товары которого помечаются лентой. Пусто — без пометок.
+    HIGHLIGHT_SECTION: 'Своё производство',
+    HIGHLIGHT_LABEL: 'своё производство',
+
     // Что писать в шапке. Оставьте пустым — программа сама покажет часы точек:
     // одинаковые часы выведет как есть, разные — отправит смотреть при оформлении.
     HOURS: 'Приём заказов в тестовом режиме'
@@ -309,7 +390,7 @@
   // =========================================================
 
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false };
+  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false };
   var $ = function (id) { return document.getElementById(id); };
   var rub = function (n) { return n.toLocaleString('ru-RU') + ' ₽'; };
 
@@ -337,8 +418,9 @@
         S.shop = savedShop();
         renderShops();
         $('loading').classList.add('hidden');
-        var sections = ['Пекарня', 'Маркет'].filter(function (sec) {
-          return S.categories.some(function (c) { return c.section === sec && hasProducts(c.name); });
+        var sections = [];
+        S.categories.forEach(function (c) {
+          if (sections.indexOf(c.section) === -1 && hasProducts(c.name)) sections.push(c.section);
         });
         S.section = sections[0] || '';
         renderSections(sections);
@@ -374,7 +456,10 @@
 
   // Заказ собирается в одном магазине: при смене убираем то, чего там нет
   function changeShop(name) {
-    var lost = cartList().filter(function (i) { return !availableAt(productById(i.id), name); });
+    var lost = cartList().filter(function (i) {
+      var product = productById(i.id);
+      return !availableAt(product, name) && !transferableAt(product, name);
+    });
     if (lost.length) {
       var names = lost.map(function (i) { return '«' + i.name + '»'; }).join(', ');
       if (!confirm('В этом магазине нет: ' + names + '. Убрать из корзины и переключиться?')) {
@@ -396,13 +481,93 @@
   }
 
   // Пустой список точек у товара означает «есть везде»
-  function availableAt(product, shop) {
-    if (!product || !product.points || !product.points.length) return true;
-    return product.points.indexOf(shop) !== -1;
+  function pointByName(name) {
+    return S.points.filter(function (p) { return p.name === name; })[0] || null;
   }
 
+  // магазин-донор для выбранной точки
+  function sourceOf(shop) {
+    var point = pointByName(shop);
+    return point && point.source ? point.source : '';
+  }
+
+  function transferNote(shop) {
+    var point = pointByName(shop);
+    return (point && point.transferNote) ? point.transferNote : 'привезём в ближайший подвоз';
+  }
+
+  // товара здесь нет, но его подвезут с донорской точки
+  function transferableAt(product, shop) {
+    var source = sourceOf(shop);
+    if (!source || availableAt(product, shop)) return false;
+    return availableAt(product, source);
+  }
+
+  // где брать товар для выбранного магазина
+  function stockPointFor(product, shop) {
+    if (availableAt(product, shop)) return shop;
+    if (transferableAt(product, shop)) return sourceOf(shop);
+    return shop;
+  }
+
+  function availableAt(product, shop) {
+    if (!product) return false;
+    var sold = !product.points || !product.points.length || product.points.indexOf(shop) !== -1;
+    if (!sold) return false;
+    var left = leftAt(product, shop);
+    return left === null || left > 0;
+  }
+
+  // в каких магазинах товар всё же есть
   function whereElse(product) {
-    return (product.points || []).join(', ');
+    var names = (product.points && product.points.length)
+      ? product.points
+      : S.points.map(function (p) { return p.name; });
+    return names.filter(function (name) {
+      var left = leftAt(product, name);
+      return left === null || left > 0;
+    }).join(', ');
+  }
+
+  function isAdultCategory(name) {
+    var category = S.categories.filter(function (c) { return c.name === name; })[0];
+    return !!(category && category.adult);
+  }
+
+  function isAdultProduct(product) {
+    return isAdultCategory(product.category);
+  }
+
+  function ageConfirmed() {
+    try { return localStorage.getItem('mv_age18') === 'yes'; } catch (e) { return S.ageOk; }
+  }
+
+  function rememberAge() {
+    S.ageOk = true;
+    try { localStorage.setItem('mv_age18', 'yes'); } catch (e) {}
+  }
+
+  // Спрашиваем возраст, когда покупатель заходит в раздел с такими товарами
+  function askAge(onYes, onNo) {
+    $('ageGate').classList.remove('hidden');
+    $('ageYes').onclick = function () {
+      rememberAge();
+      $('ageGate').classList.add('hidden');
+      if (onYes) onYes();
+    };
+    $('ageNo').onclick = function () {
+      $('ageGate').classList.add('hidden');
+      if (onNo) onNo();
+    };
+  }
+
+  function sectionHasAdult(section) {
+    return S.categories.some(function (c) { return c.section === section && c.adult; });
+  }
+
+  function sectionOf(product) {
+    var category = S.categories.filter(function (c) { return c.name === product.category; })[0];
+    return category ? category.section : '';
   }
 
   function hasProducts(category) {
@@ -432,8 +597,13 @@
       b.type = 'button'; b.textContent = sec;
       b.setAttribute('aria-pressed', String(sec === S.section));
       b.onclick = function () {
-        S.section = sec; S.category = ''; haptic();
-        renderSections(sections); renderChips(); render();
+        haptic();
+        var go = function () {
+          S.section = sec; S.category = '';
+          renderSections(sections); renderChips(); render();
+        };
+        if (sectionHasAdult(sec) && !ageConfirmed()) askAge(go, null);
+        else go();
       };
       box.appendChild(b);
     });
@@ -467,6 +637,7 @@
   function visibleProducts() {
     var q = $('search').value.trim().toLowerCase();
     return S.products.filter(function (p) {
+      if (isAdultProduct(p) && !ageConfirmed()) return false;
       if (q) return p.name.toLowerCase().indexOf(q) !== -1;
       var cat = S.categories.filter(function (c) { return c.name === p.category; })[0];
       if (!cat || cat.section !== S.section) return false;
@@ -477,8 +648,11 @@
   function render() {
     var all = visibleProducts();
     var here = all.filter(function (p) { return availableAt(p, S.shop); });
-    var away = all.filter(function (p) { return !availableAt(p, S.shop); });
-    var items = here.concat(away);
+    var transfer = all.filter(function (p) { return transferableAt(p, S.shop); });
+    var away = all.filter(function (p) {
+      return !availableAt(p, S.shop) && !transferableAt(p, S.shop);
+    });
+    var items = here.concat(transfer).concat(away);
 
     var grid = $('grid');
     grid.innerHTML = '';
@@ -501,8 +675,30 @@
 
   function cardFor(p) {
     var here = availableAt(p, S.shop);
+    var transfer = !here && transferableAt(p, S.shop);
     var card = document.createElement('div');
-    card.className = 'card' + (here ? '' : ' away');
+    card.className = 'card' + (here || transfer ? '' : ' away');
+
+    if (transfer) {
+      var badge = document.createElement('div');
+      badge.className = 'ribbon transfer';
+      badge.textContent = 'привезём';
+      card.appendChild(badge);
+    }
+
+    if (CONFIG.HIGHLIGHT_SECTION && sectionOf(p) === CONFIG.HIGHLIGHT_SECTION) {
+      var ribbon = document.createElement('div');
+      ribbon.className = 'ribbon';
+      ribbon.textContent = CONFIG.HIGHLIGHT_LABEL || CONFIG.HIGHLIGHT_SECTION;
+      card.appendChild(ribbon);
+    }
+
+    if (isAdultProduct(p)) {
+      var mark = document.createElement('div');
+      mark.className = 'adult';
+      mark.textContent = '18+';
+      card.appendChild(mark);
+    }
 
     var ph = document.createElement('div');
     ph.className = 'ph';
@@ -523,32 +719,46 @@
       var d = document.createElement('p'); d.textContent = p.description; body.appendChild(d);
     }
 
-    if (p.quantity !== null && p.quantity !== undefined && p.quantity <= 5) {
-      var left = document.createElement('p');
-      left.className = 'left';
-      left.textContent = 'осталось ' + p.quantity + ' шт.';
-      body.appendChild(left);
+    if (transfer) {
+      var order = document.createElement('p');
+      order.className = 'transfer-note';
+      order.textContent = 'Привезём ' + transferNote(S.shop);
+      body.appendChild(order);
+    }
+
+    var leftHere = leftAt(p, stockPointFor(p, S.shop));
+    if (here && leftHere !== null && leftHere <= 5) {
+      var leftNote = document.createElement('p');
+      leftNote.className = 'left';
+      leftNote.textContent = 'осталось ' + leftHere + ' шт.';
+      body.appendChild(leftNote);
     }
 
     var row = document.createElement('div');
     row.className = 'row';
     var price = document.createElement('div'); price.className = 'price'; price.textContent = rub(p.price);
-    if (!here) {
+    if (!here && !transfer) {
+      var elsewhere = whereElse(p);
       var note = document.createElement('p');
       note.className = 'away-note';
-      note.textContent = 'Только в: ' + whereElse(p);
+      note.textContent = elsewhere ? 'Есть в: ' + elsewhere : 'Закончился';
       body.appendChild(note);
     }
 
     row.appendChild(price);
-    if (here) {
+    if (here || transfer) {
       row.appendChild(controlFor(p));
     } else {
       var off = document.createElement('button');
       off.className = 'nohere'; off.type = 'button'; off.textContent = 'Нет здесь';
       off.onclick = function () {
-        if (confirm('«' + p.name + '» есть в: ' + whereElse(p) + '. Переключиться на этот магазин?')) {
-          changeShop(p.points[0]);
+        var elsewhere = whereElse(p).split(', ').filter(Boolean);
+        if (!elsewhere.length) {
+          alert('«' + p.name + '» сейчас закончился во всех магазинах.');
+          return;
+        }
+        if (confirm('«' + p.name + '» есть в: ' + elsewhere.join(', ') + '. Переключиться на этот магазин?')) {
+          changeShop(elsewhere[0]);
           $('shopSelect').value = S.shop;
         }
       };
@@ -581,8 +791,16 @@
     return box;
   }
 
+  // остаток в выбранном магазине; нет числа — не ограничено
+  function leftAt(p, shop) {
+    if (!p.stock) return null;
+    var value = p.stock[shop || S.shop];
+    return (value === undefined || value === null) ? null : value;
+  }
+
   function maxQty(p) {
-    return (p.quantity === null || p.quantity === undefined) ? 99 : Math.min(99, p.quantity);
+    var left = leftAt(p, stockPointFor(p, S.shop));
+    return left === null ? 99 : Math.min(99, left);
   }
 
   function setQty(p, qty) {
@@ -707,7 +925,37 @@
     return S.points.filter(function (p) { return p.name === S.shop; })[0] || S.points[0];
   }
 
+  function transferItems() {
+    return cartList().filter(function (i) {
+      return transferableAt(productById(i.id), S.shop);
+    });
+  }
+
+  function cartHasAdult() {
+    return cartList().some(function (i) { return isAdultProduct(productById(i.id)); });
+  }
+
   function renderShopInfo() {
+    $('adultNote').classList.toggle('hidden', !cartHasAdult());
+
+    var transfers = transferItems();
+    var box = $('transferNote');
+    box.classList.toggle('hidden', !transfers.length);
+    if (transfers.length) {
+      box.textContent = 'Часть товаров привезём с точки «' + sourceOf(S.shop) + '» — '
+        + transferNote(S.shop) + '. Мы позвоним, когда заказ будет готов к выдаче. '
+        + 'Пока такие заказы выдаются только самовывозом.';
+    }
+    // доставка недоступна, если что-то нужно подвозить
+    var deliveryInput = document.querySelector('input[name=delivery][value=Доставка]');
+    if (deliveryInput) {
+      var lock = transfers.length > 0;
+      deliveryInput.disabled = lock;
+      deliveryInput.parentNode.style.opacity = lock ? '.45' : '';
+      if (lock && selectedDelivery() === 'Доставка') {
+        document.querySelector('input[name=delivery][value=Самовывоз]').checked = true;
+      }
+    }
     var point = selectedPickup();
     if (!point) { $('shopInfo').classList.add('hidden'); return; }
     $('shopInfo').classList.remove('hidden');
@@ -749,9 +997,15 @@
     if (phone.replace(/\D/g, '').length < 10) return fail('Укажите телефон, чтобы мы могли подтвердить заказ.', 'fphone');
     if (delivery === 'Доставка' && !address) return fail('Укажите адрес доставки.', 'faddress');
     if (delivery === 'Доставка' && cartTotal() < CONFIG.MIN_DELIVERY) return fail('Сумма меньше минимальной для доставки.');
+    if (!$('consent').checked) return fail('Отметьте согласие на обработку данных — без него мы не сможем принять заказ.');
     err.classList.add('hidden');
 
     var comment = [];
+    var transfers = transferItems();
+    if (transfers.length) {
+      comment.push('Подвезти с точки «' + sourceOf(S.shop) + '»: '
+        + transfers.map(function (i) { return i.name + ' × ' + i.qty; }).join(', '));
+    }
     if ($('ftime').value.trim()) comment.push('Удобное время: ' + $('ftime').value.trim());
     if ($('fcomment').value.trim()) comment.push($('fcomment').value.trim());
 
@@ -767,6 +1021,9 @@
         items: cartList().map(function (i) { return { name: i.name, price: i.price, qty: i.qty }; }),
         customerName: name,
         username: user && user.username ? '@' + user.username : '',
+        tgId: user && user.id ? String(user.id) : '',
+        consent: true,
+        adult: cartHasAdult(),
         phone: phone,
         address: delivery === 'Доставка' ? address : pickupText(),
         delivery: deliveryText(),
@@ -779,6 +1036,7 @@
         if (!res || !res.ok) throw new Error('bad');
         $('doneNumber').textContent = res.number || '';
         S.cart = {}; saveCart();
+        $('consent').checked = false;
         haptic('medium');
         showView('done');
       })
@@ -797,9 +1055,11 @@
   function deliveryText() {
     var point = selectedPickup();
     var shop = point ? point.name : '';
-    return selectedDelivery() === 'Самовывоз'
-      ? 'Самовывоз: ' + shop
-      : 'Доставка из магазина: ' + shop;
+    var transfers = transferItems();
+    if (selectedDelivery() !== 'Самовывоз') return 'Доставка из магазина: ' + shop;
+    return transfers.length
+      ? 'Самовывоз: ' + shop + ' (часть товаров подвезти с точки «' + sourceOf(S.shop) + '»)'
+      : 'Самовывоз: ' + shop;
   }
 
   function fail(message, focusId) {
@@ -823,10 +1083,29 @@
     return '';
   }
 
+  function renderConsent() {
+    var box = $('consentText');
+    box.innerHTML = '';
+    box.appendChild(document.createTextNode('Я согласен на обработку моих данных для оформления и доставки заказа'));
+    if (!CONFIG.PRIVACY_URL) { box.appendChild(document.createTextNode('.')); return; }
+    box.appendChild(document.createTextNode(' — '));
+    var link = document.createElement('a');
+    link.href = CONFIG.PRIVACY_URL;
+    link.textContent = 'политика конфиденциальности';
+    link.onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (tg && tg.openLink) tg.openLink(CONFIG.PRIVACY_URL);
+      else window.open(CONFIG.PRIVACY_URL, '_blank');
+    };
+    box.appendChild(link);
+  }
+
   // ---------- Запуск ----------
   $('hours').textContent = headerHours();
   $('pickupHint').textContent = 'из выбранного магазина';
   $('deliveryHint').textContent = 'от ' + rub(CONFIG.MIN_DELIVERY);
+  renderConsent();
   $('search').addEventListener('input', render);
   $('backFromCart').addEventListener('click', function () { showView('shop'); });
   $('backFromCheckout').addEventListener('click', function () { showView('cart'); });
