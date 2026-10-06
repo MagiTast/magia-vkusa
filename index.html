@@ -82,6 +82,15 @@
     flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); color: var(--ink);
     padding: 7px 14px; border-radius: 99px; cursor: pointer; white-space: nowrap; font-size: 15px;
   }
+  .sortrow {
+    display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+    padding-bottom: 10px; font-size: 13px; color: var(--muted);
+  }
+  .sortrow select {
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    border-radius: 99px; padding: 5px 10px; outline: none; font-size: 13px;
+  }
+
   .chips button[aria-pressed=true] { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--card)); color: var(--brand-dark); font-weight: 600; }
 
   /* Каталог */
@@ -254,6 +263,14 @@
     </div>
     <div class="sections" id="sections" role="group"></div>
     <div class="chips" id="chips"></div>
+    <div class="sortrow">
+      <label for="sortSelect">Сортировка</label>
+      <select id="sortSelect">
+        <option value="">как в каталоге</option>
+        <option value="asc">сначала дешевле</option>
+        <option value="desc">сначала дороже</option>
+      </select>
+    </div>
   </header>
 
   <main>
@@ -390,7 +407,7 @@
   // =========================================================
 
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false };
+  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false, sort: '' };
   var $ = function (id) { return document.getElementById(id); };
   var rub = function (n) { return n.toLocaleString('ru-RU') + ' ₽'; };
 
@@ -647,6 +664,7 @@
 
   function render() {
     var all = visibleProducts();
+    all = sortProducts(all);
     var here = all.filter(function (p) { return availableAt(p, S.shop); });
     var transfer = all.filter(function (p) { return transferableAt(p, S.shop); });
     var away = all.filter(function (p) {
@@ -671,6 +689,16 @@
       empty.classList.add('hidden');
     }
     updateBar();
+  }
+
+  // порядок внутри каждой группы: как в каталоге либо по цене
+  function sortProducts(list) {
+    if (!S.sort) return list;
+    var sign = S.sort === 'asc' ? 1 : -1;
+    return list.slice().sort(function (a, b) {
+      if (a.price === b.price) return a.name.localeCompare(b.name, 'ru');
+      return (a.price - b.price) * sign;
+    });
   }
 
   function cardFor(p) {
@@ -1018,7 +1046,9 @@
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
-        items: cartList().map(function (i) { return { name: i.name, price: i.price, qty: i.qty }; }),
+        items: cartList().map(function (i) {
+          return { id: i.id, name: i.name, price: i.price, qty: i.qty };
+        }),
         customerName: name,
         username: user && user.username ? '@' + user.username : '',
         tgId: user && user.id ? String(user.id) : '',
@@ -1106,6 +1136,14 @@
   $('pickupHint').textContent = 'из выбранного магазина';
   $('deliveryHint').textContent = 'от ' + rub(CONFIG.MIN_DELIVERY);
   renderConsent();
+  try { S.sort = localStorage.getItem('mv_sort') || ''; } catch (e) {}
+  $('sortSelect').value = S.sort;
+  $('sortSelect').addEventListener('change', function () {
+    S.sort = this.value;
+    try { localStorage.setItem('mv_sort', S.sort); } catch (e) {}
+    haptic();
+    render();
+  });
   $('search').addEventListener('input', render);
   $('backFromCart').addEventListener('click', function () { showView('shop'); });
   $('backFromCheckout').addEventListener('click', function () { showView('cart'); });
