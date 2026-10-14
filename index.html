@@ -112,6 +112,10 @@
   .card p { margin: 0; font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .card .row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto; padding-top: 10px; }
   .card .price { font-weight: 700; white-space: nowrap; }
+  .card .weigh-note {
+    margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #2F6FB0;
+    display: block; overflow: visible; -webkit-line-clamp: none;
+  }
   .card .left { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #C2703B; }
   .modal {
     position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.55);
@@ -332,6 +336,8 @@
   </div>
 
   <div class="info hidden" id="transferNote"></div>
+
+  <div class="info hidden" id="weighNote">В заказе есть весовые товары. Мы взвесим их при сборке и сообщим итоговую сумму — она может отличаться от предварительной.</div>
 
   <div class="adultnote hidden" id="adultNote">В заказе есть товары 18+. Приготовьте документ: продавец проверит возраст при выдаче, иначе эти позиции придётся исключить.</div>
 
@@ -754,6 +760,13 @@
       body.appendChild(order);
     }
 
+    if (p.pricePerKg > 0) {
+      var weighNote = document.createElement('p');
+      weighNote.className = 'weigh-note';
+      weighNote.textContent = rub(p.pricePerKg) + '/кг · взвесим при сборке';
+      body.appendChild(weighNote);
+    }
+
     var leftHere = leftAt(p, stockPointFor(p, S.shop));
     if (here && leftHere !== null && leftHere <= 5) {
       var leftNote = document.createElement('p');
@@ -963,8 +976,13 @@
     return cartList().some(function (i) { return isAdultProduct(productById(i.id)); });
   }
 
+  function cartHasWeighed() {
+    return cartList().some(function (i) { return productById(i.id).pricePerKg > 0; });
+  }
+
   function renderShopInfo() {
     $('adultNote').classList.toggle('hidden', !cartHasAdult());
+    $('weighNote').classList.toggle('hidden', !cartHasWeighed());
 
     var transfers = transferItems();
     var box = $('transferNote');
