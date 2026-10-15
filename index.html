@@ -16,14 +16,43 @@
     --bg: #FBFAF7;
     --card: #FFFFFF;
     --danger: #B3261E;
+    --info: #2F6FB0;        /* подвоз с другой точки, весовой товар */
+    --warn: #C2703B;        /* заканчивается */
+    --on-brand: #FFFFFF;    /* текст на зелёной кнопке */
     --radius: 16px;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  /* тёмная тема: по системе, если Telegram не сказал иначе */
   @media (prefers-color-scheme: dark) {
-    :root {
-      --ink: #F2EFE9; --muted: #A5A098; --line: #34312B;
-      --bg: #171613; --card: #201E1A; --danger: #F2867E;
+    :root:not([data-theme="light"]) {
+      --brand: #8CBB70;
+      --brand-dark: #A3CE88;
+      --ink: #F2EFE9;
+      --muted: #A5A098;
+      --line: #34312B;
+      --bg: #171613;
+      --card: #201E1A;
+      --danger: #F2867E;
+      --info: #7FB3E8;
+      --warn: #E0A06B;
+      --on-brand: #15210F;
     }
+  }
+
+  /* тёмная тема Telegram — даже если система светлая */
+  :root[data-theme="dark"] {
+    --brand: #8CBB70;
+    --brand-dark: #A3CE88;
+    --ink: #F2EFE9;
+    --muted: #A5A098;
+    --line: #34312B;
+    --bg: #171613;
+    --card: #201E1A;
+    --danger: #F2867E;
+    --info: #7FB3E8;
+    --warn: #E0A06B;
+    --on-brand: #15210F;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--ink); }
@@ -60,12 +89,12 @@
     background: var(--card); outline: none; font-weight: 600;
   }
   .card.away { opacity: .55; }
-  .card .away-note { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #B3261E; }
+  .card .away-note { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--danger); }
   .card .transfer-note {
-    margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #2F6FB0;
+    margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--info);
     display: block; overflow: visible; -webkit-line-clamp: none;
   }
-  .card .ribbon.transfer { background: #2F6FB0; }
+  .card .ribbon.transfer { background: var(--info); color: #fff; }
   .nohere { border: 0; background: var(--line); color: var(--muted); font-weight: 600; padding: 8px 13px; border-radius: 99px; font-size: 14px; }
 
   .sections {
@@ -74,7 +103,7 @@
   }
   .sections::-webkit-scrollbar { display: none; }
   .sections button { flex: 0 0 auto; border: 0; background: none; padding: 7px 16px; border-radius: 99px; cursor: pointer; color: var(--muted); font-weight: 500; white-space: nowrap; }
-  .sections button[aria-pressed=true] { background: var(--brand); color: #fff; font-weight: 600; }
+  .sections button[aria-pressed=true] { background: var(--brand); color: var(--on-brand); font-weight: 600; }
 
   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
@@ -97,7 +126,7 @@
   .chips.subs { padding-bottom: 10px; }
   .chips.subs button { font-size: 14px; padding: 6px 12px; background: var(--bg); }
   .chips.subs button[aria-pressed=true] {
-    border-color: var(--brand-dark); background: var(--brand); color: #fff; font-weight: 600;
+    border-color: var(--brand-dark); background: var(--brand); color: var(--on-brand); font-weight: 600;
   }
 
   .chips button[aria-pressed=true] { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--card)); color: var(--brand-dark); font-weight: 600; }
@@ -110,7 +139,7 @@
   .card { position: relative; }
   .card .ribbon {
     position: absolute; top: 8px; left: 8px; z-index: 1;
-    background: var(--brand); color: #fff; font-size: 11px; font-weight: 700;
+    background: var(--brand); color: var(--on-brand); font-size: 11px; font-weight: 700;
     padding: 4px 9px; border-radius: 99px; letter-spacing: .01em;
   }
   .card .ph { aspect-ratio: 1; background: color-mix(in srgb, var(--brand) 8%, var(--card)); display: grid; place-items: center; overflow: hidden; }
@@ -127,10 +156,10 @@
   .card .row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto; padding-top: 10px; }
   .card .price { font-weight: 700; white-space: nowrap; }
   .card .weigh-note {
-    margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #2F6FB0;
+    margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--info);
     display: block; overflow: visible; -webkit-line-clamp: none;
   }
-  .card .left { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #C2703B; }
+  .card .left { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--warn); }
   .modal {
     position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.55);
     display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -184,14 +213,14 @@
   }
 
   .add {
-    border: 0; background: var(--brand); color: #fff; font-weight: 600;
+    border: 0; background: var(--brand); color: var(--on-brand); font-weight: 600;
     padding: 8px 13px; border-radius: 99px; cursor: pointer;
     font-size: 14px; white-space: nowrap;
   }
   .add:active { background: var(--brand-dark); }
   .stepper { display: inline-flex; align-items: center; gap: 2px; background: var(--brand); border-radius: 99px; }
-  .stepper button { border: 0; background: none; color: #fff; width: 32px; height: 32px; font-size: 19px; cursor: pointer; border-radius: 99px; }
-  .stepper span { color: #fff; font-weight: 700; min-width: 20px; text-align: center; font-size: 15px; }
+  .stepper button { border: 0; background: none; color: var(--on-brand); width: 32px; height: 32px; font-size: 19px; cursor: pointer; border-radius: 99px; }
+  .stepper span { color: var(--on-brand); font-weight: 700; min-width: 20px; text-align: center; font-size: 15px; }
 
   .state { text-align: center; color: var(--muted); padding: 60px 20px; }
   .state h2 { color: var(--ink); font-size: 18px; margin: 0 0 6px; }
@@ -207,7 +236,7 @@
   }
   .bigbtn {
     width: 100%; border: 0; border-radius: 14px; padding: 15px 18px; font-size: 16px; font-weight: 600;
-    background: var(--brand); color: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: var(--brand); color: var(--on-brand); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px;
   }
   .bigbtn:disabled { background: var(--line); color: var(--muted); cursor: default; }
   .bigbtn .sum { font-variant-numeric: tabular-nums; }
@@ -1350,9 +1379,23 @@
     r.addEventListener('change', updateDeliveryUI);
   });
 
+  // тема берётся из Telegram; если он молчит — из настроек телефона
+  function applyTheme() {
+    if (!tg || !tg.colorScheme) return;
+    document.documentElement.setAttribute('data-theme', tg.colorScheme);
+    // цвет панели и фона самого окна Telegram
+    try {
+      var dark = tg.colorScheme === 'dark';
+      if (tg.setHeaderColor) tg.setHeaderColor(dark ? '#171613' : '#FBFAF7');
+      if (tg.setBackgroundColor) tg.setBackgroundColor(dark ? '#171613' : '#FBFAF7');
+    } catch (e) {}
+  }
+
   if (tg) {
     tg.ready();
     tg.expand();
+    applyTheme();
+    if (tg.onEvent) tg.onEvent('themeChanged', applyTheme);
     if (tg.BackButton) {
       tg.BackButton.onClick(function () {
         showView(S.view === 'checkout' ? 'cart' : 'shop');
