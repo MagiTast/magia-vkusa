@@ -94,6 +94,12 @@
     border-radius: 99px; padding: 5px 10px; outline: none; font-size: 13px;
   }
 
+  .chips.subs { padding-bottom: 10px; }
+  .chips.subs button { font-size: 14px; padding: 6px 12px; background: var(--bg); }
+  .chips.subs button[aria-pressed=true] {
+    border-color: var(--brand-dark); background: var(--brand); color: #fff; font-weight: 600;
+  }
+
   .chips button[aria-pressed=true] { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--card)); color: var(--brand-dark); font-weight: 600; }
 
   /* Каталог */
@@ -290,6 +296,7 @@
     </div>
     <div class="sections" id="sections" role="group"></div>
     <div class="chips" id="chips"></div>
+    <div class="chips subs hidden" id="subchips"></div>
     <div class="sortrow">
       <select id="brandSelect" class="hidden" aria-label="Бренд"></select>
       <select id="sortSelect" aria-label="Сортировка" title="Сортировка">
@@ -444,7 +451,7 @@
   // =========================================================
 
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false, sort: '', brand: '' };
+  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false, sort: '', brand: '', sub: '' };
   var $ = function (id) { return document.getElementById(id); };
   var rub = function (n) { return n.toLocaleString('ru-RU') + ' ₽'; };
 
@@ -679,7 +686,7 @@
       b.onclick = function () {
         haptic();
         var go = function () {
-          S.section = sec; S.category = ''; S.brand = '';
+          S.section = sec; S.category = ''; S.brand = ''; S.sub = '';
           renderSections(sections); renderChips(); render();
         };
         if (sectionHasAdult(sec) && !ageConfirmed()) askAge(go, null);
@@ -700,7 +707,7 @@
     var all = document.createElement('button');
     all.type = 'button'; all.textContent = 'Всё';
     all.setAttribute('aria-pressed', String(S.category === ''));
-    all.onclick = function () { S.category = ''; S.brand = ''; renderChips(); render(); };
+    all.onclick = function () { S.category = ''; S.brand = ''; S.sub = ''; renderChips(); render(); };
     box.appendChild(all);
 
     cats.forEach(function (c) {
@@ -711,7 +718,7 @@
       b.onclick = function () {
         haptic();
         var go = function () {
-          S.category = c.name; S.brand = '';
+          S.category = c.name; S.brand = ''; S.sub = '';
           renderChips(); render();
         };
         if (c.adult && !ageConfirmed()) askAge(go, null); else go();
@@ -726,6 +733,7 @@
     return S.products.filter(function (p) {
       if (isAdultProduct(p) && !ageConfirmed()) return false;
       if (S.brand && p.brand !== S.brand) return false;
+      if (S.sub && p.subcategory !== S.sub) return false;
       if (q) {
         return p.name.toLowerCase().indexOf(q) !== -1
             || (p.brand && p.brand.toLowerCase().indexOf(q) !== -1);
@@ -737,6 +745,7 @@
   }
 
   function render() {
+    renderSubs();
     renderBrands();
     renderAdultGate();
     var all = visibleProducts();
@@ -786,6 +795,46 @@
       if (names.indexOf(p.brand) === -1) names.push(p.brand);
     });
     return names.sort(function (a, b) { return a.localeCompare(b, 'ru'); });
+  }
+
+  // подкатегории внутри выбранной категории
+  function subsHere() {
+    if (!S.category) return [];
+    var names = [];
+    S.products.forEach(function (p) {
+      if (p.category !== S.category || !p.subcategory) return;
+      if (isAdultProduct(p) && !ageConfirmed()) return;
+      if (names.indexOf(p.subcategory) === -1) names.push(p.subcategory);
+    });
+    return names.sort(function (a, b) { return a.localeCompare(b, 'ru'); });
+  }
+
+  function renderSubs() {
+    var box = $('subchips');
+    var names = subsHere();
+
+    if (S.sub && names.indexOf(S.sub) === -1) S.sub = '';
+    if (names.length < 2) {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      return;
+    }
+    box.classList.remove('hidden');
+    box.innerHTML = '';
+
+    var all = document.createElement('button');
+    all.type = 'button'; all.textContent = 'Все';
+    all.setAttribute('aria-pressed', String(S.sub === ''));
+    all.onclick = function () { S.sub = ''; haptic(); render(); };
+    box.appendChild(all);
+
+    names.forEach(function (name) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = name;
+      b.setAttribute('aria-pressed', String(S.sub === name));
+      b.onclick = function () { S.sub = name; haptic(); render(); };
+      box.appendChild(b);
+    });
   }
 
   function renderBrands() {
@@ -862,10 +911,11 @@
 
     var body = document.createElement('div');
     body.className = 'body';
-    if (p.brand) {
+    var topLine = p.brand || (!S.sub ? p.subcategory : '');
+    if (topLine) {
       var brandLine = document.createElement('p');
       brandLine.className = 'brand-line';
-      brandLine.textContent = p.brand;
+      brandLine.textContent = topLine;
       body.appendChild(brandLine);
     }
 
