@@ -136,6 +136,21 @@
   .modalbox h2 { font-size: 19px; margin: 0 0 8px; }
   .modalbox p { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
   .modalbox .bigbtn { justify-content: center; margin-bottom: 8px; }
+  .agegate {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+    padding: 12px 14px; border-radius: var(--radius);
+    background: color-mix(in srgb, var(--danger) 9%, var(--card));
+    border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+  }
+  .agegate .agetext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .agegate .agetext strong { font-size: 14px; }
+  .agegate .agetext span { font-size: 12px; color: var(--muted); }
+  .agegate button {
+    margin-left: auto; flex: none; border: 0; border-radius: 99px; cursor: pointer;
+    background: var(--danger); color: #fff; font-weight: 600; padding: 9px 16px; font-size: 14px;
+  }
+  .agemark.small { width: 38px; height: 38px; font-size: 13px; margin: 0; flex: none; }
+
   .agemark {
     width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%;
     background: color-mix(in srgb, var(--danger) 14%, var(--card)); color: var(--danger);
@@ -289,6 +304,14 @@
     <div class="state" id="loading">
       <div class="spinner"></div>
       Загружаем каталог…
+    </div>
+    <div class="agegate hidden" id="adultGate">
+      <div class="agemark small">18+</div>
+      <div class="agetext">
+        <strong id="adultGateTitle">Здесь есть товары 18+</strong>
+        <span>Они продаются только совершеннолетним. Продавец проверит документ при выдаче.</span>
+      </div>
+      <button type="button" id="adultGateBtn">Мне есть 18</button>
     </div>
     <div class="state hidden" id="empty"></div>
     <div class="grid" id="grid"></div>
@@ -592,6 +615,32 @@
     };
   }
 
+  // товары 18+, которые покупатель сейчас не видит только из-за возраста
+  function hiddenAdultCount() {
+    if (ageConfirmed()) return 0;
+    var q = $('search').value.trim().toLowerCase();
+    return S.products.filter(function (p) {
+      if (!isAdultProduct(p)) return false;
+      if (q) {
+        return p.name.toLowerCase().indexOf(q) !== -1
+            || (p.brand && p.brand.toLowerCase().indexOf(q) !== -1);
+      }
+      var category = S.categories.filter(function (c) { return c.name === p.category; })[0];
+      if (!category || category.section !== S.section) return false;
+      return !S.category || p.category === S.category;
+    }).length;
+  }
+
+  function renderAdultGate() {
+    var count = hiddenAdultCount();
+    $('adultGate').classList.toggle('hidden', count === 0);
+    if (count > 0) {
+      $('adultGateTitle').textContent = count === 1
+        ? 'Здесь скрыт 1 товар 18+'
+        : 'Здесь скрыто товаров 18+: ' + count;
+    }
+  }
+
   function sectionHasAdult(section) {
     return S.categories.some(function (c) { return c.section === section && c.adult; });
   }
@@ -659,7 +708,14 @@
       b.type = 'button';
       b.textContent = (c.emoji ? c.emoji + ' ' : '') + c.name;
       b.setAttribute('aria-pressed', String(S.category === c.name));
-      b.onclick = function () { S.category = c.name; S.brand = ''; haptic(); renderChips(); render(); };
+      b.onclick = function () {
+        haptic();
+        var go = function () {
+          S.category = c.name; S.brand = '';
+          renderChips(); render();
+        };
+        if (c.adult && !ageConfirmed()) askAge(go, null); else go();
+      };
       box.appendChild(b);
     });
   }
@@ -682,6 +738,7 @@
 
   function render() {
     renderBrands();
+    renderAdultGate();
     var all = visibleProducts();
     all = sortProducts(all);
     var here = all.filter(function (p) { return availableAt(p, S.shop); });
@@ -1227,6 +1284,10 @@
     haptic();
     render();
   });
+  $('adultGateBtn').addEventListener('click', function () {
+    askAge(function () { render(); }, null);
+  });
+  $('brandSelect').addEventListener('click', function () {});
   $('brandSelect').addEventListener('change', function () {
     S.brand = this.value;
     haptic();
