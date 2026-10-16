@@ -123,6 +123,46 @@
     border-radius: 99px; padding: 5px 10px; outline: none; font-size: 13px;
   }
 
+  /* Категории: выпадающий список */
+  .catpick { position: relative; padding-bottom: 12px; }
+  .catbtn {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    padding: 10px 15px; border-radius: 99px; cursor: pointer; font-size: 15px; font-weight: 600;
+  }
+  .catbtn .cur { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .catbtn .chev { flex: none; color: var(--muted); transition: transform .18s ease; }
+  .catbtn[aria-expanded=true] { border-color: var(--brand); }
+  .catbtn[aria-expanded=true] .chev { transform: rotate(180deg); }
+  .catbtn[data-active=yes] {
+    border-color: var(--brand); color: var(--brand-dark);
+    background: color-mix(in srgb, var(--brand) 14%, var(--card));
+  }
+  .catmenu {
+    position: absolute; left: 0; right: 0; top: calc(100% - 5px); z-index: 2;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .18);
+    padding: 6px; max-height: 58vh; overflow-y: auto;
+  }
+  .catmenu button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    border: 0; background: none; color: var(--ink); cursor: pointer;
+    padding: 11px 12px; border-radius: 12px; font-size: 15px;
+  }
+  .catmenu .nm { flex: 1 1 auto; min-width: 0; }
+  .catmenu .cnt { flex: none; color: var(--muted); font-size: 13px; }
+  .catmenu button[aria-selected=true] {
+    background: color-mix(in srgb, var(--brand) 14%, var(--card));
+    color: var(--brand-dark); font-weight: 600;
+  }
+  .catmenu button[aria-selected=true] .cnt { color: var(--brand-dark); }
+  @media (hover: hover) {
+    .catmenu button:hover { background: var(--bg); }
+    .catmenu button[aria-selected=true]:hover { background: color-mix(in srgb, var(--brand) 20%, var(--card)); }
+  }
+  .catscreen { position: fixed; inset: 0; z-index: 10; background: transparent; }
+  header.menuopen { z-index: 11; }
+
   .chips.subs { padding-bottom: 10px; }
   .chips.subs button { font-size: 14px; padding: 6px 12px; background: var(--bg); }
   .chips.subs button[aria-pressed=true] {
@@ -324,7 +364,13 @@
       <select id="shopSelect" aria-label="Выберите магазин"></select>
     </div>
     <div class="sections" id="sections" role="group"></div>
-    <div class="chips" id="chips"></div>
+    <div class="catpick hidden" id="catpick">
+      <button type="button" class="catbtn" id="catBtn" aria-haspopup="listbox" aria-expanded="false">
+        <span class="cur" id="catCur">Все категории</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="catmenu hidden" id="catMenu" role="listbox" aria-label="Категории"></div>
+    </div>
     <div class="chips subs hidden" id="subchips"></div>
     <div class="sortrow">
       <select id="brandSelect" class="hidden" aria-label="Бренд"></select>
@@ -725,35 +771,120 @@
     });
   }
 
-  function renderChips() {
-    var box = $('chips');
-    box.innerHTML = '';
-    var cats = S.categories.filter(function (c) {
+  function categoriesHere() {
+    return S.categories.filter(function (c) {
       return c.section === S.section && hasProducts(c.name);
     });
-    if (!cats.length) return;
+  }
 
-    var all = document.createElement('button');
-    all.type = 'button'; all.textContent = 'Всё';
-    all.setAttribute('aria-pressed', String(S.category === ''));
-    all.onclick = function () { S.category = ''; S.brand = ''; S.sub = ''; renderChips(); render(); };
-    box.appendChild(all);
+  // сколько товаров покупатель увидит в категории
+  function countIn(name) {
+    return S.products.filter(function (p) {
+      if (p.category !== name) return false;
+      return !(isAdultProduct(p) && !ageConfirmed());
+    }).length;
+  }
 
+  function countInSection() {
+    return S.products.filter(function (p) {
+      if (isAdultProduct(p) && !ageConfirmed()) return false;
+      var c = S.categories.filter(function (x) { return x.name === p.category; })[0];
+      return !!c && c.section === S.section;
+    }).length;
+  }
+
+  function catMenuOpen() {
+    return !$('catMenu').classList.contains('hidden');
+  }
+
+  function closeCatMenu() {
+    $('catMenu').classList.add('hidden');
+    $('catBtn').setAttribute('aria-expanded', 'false');
+    document.querySelector('header').classList.remove('menuopen');
+    var screen = $('catScreen');
+    if (screen && screen.parentNode) screen.parentNode.removeChild(screen);
+  }
+
+  function openCatMenu() {
+    var menu = $('catMenu');
+    menu.classList.remove('hidden');
+    $('catBtn').setAttribute('aria-expanded', 'true');
+    document.querySelector('header').classList.add('menuopen');
+    var screen = document.createElement('div');
+    screen.className = 'catscreen';
+    screen.id = 'catScreen';
+    screen.onclick = closeCatMenu;
+    document.body.appendChild(screen);
+    var active = menu.querySelector('[aria-selected=true]');
+    if (active && active.scrollIntoView) {
+      try { active.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+    }
+  }
+
+  function renderChips() {
+    var pick = $('catpick'), menu = $('catMenu'), btn = $('catBtn');
+    var cats = categoriesHere();
+
+    closeCatMenu();
+
+    // в разделе одна категория или ни одной — выбирать не из чего
+    if (cats.length < 2) {
+      pick.classList.add('hidden');
+      S.category = cats.length === 1 ? cats[0].name : '';
+      return;
+    }
+    pick.classList.remove('hidden');
+
+    var chosen = cats.filter(function (c) { return c.name === S.category; })[0];
+    if (!chosen) S.category = '';
+    $('catCur').textContent = chosen
+      ? (chosen.emoji ? chosen.emoji + ' ' : '') + chosen.name
+      : 'Все категории';
+    btn.setAttribute('data-active', chosen ? 'yes' : 'no');
+    btn.onclick = function () {
+      haptic();
+      if (catMenuOpen()) closeCatMenu(); else openCatMenu();
+    };
+
+    menu.innerHTML = '';
+    menu.appendChild(catOption('Все категории', '', !chosen, countInSection(), null));
     cats.forEach(function (c) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = (c.emoji ? c.emoji + ' ' : '') + c.name;
-      b.setAttribute('aria-pressed', String(S.category === c.name));
-      b.onclick = function () {
-        haptic();
-        var go = function () {
-          S.category = c.name; S.brand = ''; S.sub = '';
-          renderChips(); render();
-        };
-        if (c.adult && !ageConfirmed()) askAge(go, null); else go();
-      };
-      box.appendChild(b);
+      menu.appendChild(catOption(
+        (c.emoji ? c.emoji + ' ' : '') + c.name,
+        c.name,
+        S.category === c.name,
+        countIn(c.name),
+        c
+      ));
     });
+  }
+
+  function catOption(label, value, selected, count, category) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'option');
+    b.setAttribute('aria-selected', String(!!selected));
+
+    var nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = label;
+    b.appendChild(nm);
+
+    var cnt = document.createElement('span');
+    cnt.className = 'cnt';
+    cnt.textContent = String(count);
+    b.appendChild(cnt);
+
+    b.onclick = function () {
+      haptic();
+      closeCatMenu();
+      var go = function () {
+        S.category = value; S.brand = ''; S.sub = '';
+        renderChips(); render();
+      };
+      if (category && category.adult && !ageConfirmed()) askAge(go, null); else go();
+    };
+    return b;
   }
 
   // ---------- Каталог ----------
@@ -1106,6 +1237,7 @@
   // ---------- Экраны ----------
   function showView(view) {
     S.view = view;
+    closeCatMenu();
     $('shopView').classList.toggle('hidden', view !== 'shop');
     $('cartView').classList.toggle('hidden', view !== 'cart');
     $('checkoutView').classList.toggle('hidden', view !== 'checkout');
@@ -1372,7 +1504,11 @@
     haptic();
     render();
   });
-  $('search').addEventListener('input', render);
+  $('search').addEventListener('input', function () { closeCatMenu(); render(); });
+  $('search').addEventListener('focus', closeCatMenu);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && catMenuOpen()) closeCatMenu();
+  });
   $('backFromCart').addEventListener('click', function () { showView('shop'); });
   $('backFromCheckout').addEventListener('click', function () { showView('cart'); });
   Array.prototype.forEach.call(document.querySelectorAll('input[name=delivery]'), function (r) {
