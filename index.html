@@ -562,6 +562,7 @@
         renderSections(sections);
         renderChips();
         render();
+        startTracking();
       })
       .catch(function () {
         showError('Не получилось загрузить каталог. Проверьте связь и попробуйте ещё раз.');
@@ -880,6 +881,7 @@
       closeCatMenu();
       var go = function () {
         S.category = value; S.brand = ''; S.sub = '';
+        if (value) track('category', value);
         renderChips(); render();
       };
       if (category && category.adult && !ageConfirmed()) askAge(go, null); else go();
@@ -919,7 +921,12 @@
 
     var grid = $('grid');
     grid.innerHTML = '';
-    items.forEach(function (p) { grid.appendChild(cardFor(p)); });
+    items.forEach(function (p) {
+      var card = cardFor(p);
+      card.setAttribute('data-name', p.name);
+      grid.appendChild(card);
+      if (viewWatcher) viewWatcher.observe(card);
+    });
 
     var empty = $('empty');
     if (!items.length) {
@@ -1148,7 +1155,7 @@
     if (!qty) {
       var add = document.createElement('button');
       add.className = 'add'; add.type = 'button'; add.textContent = 'В корзину';
-      add.onclick = function () { setQty(p, 1); };
+      add.onclick = function () { setQty(p, 1); track('cart', p.name); };
       return add;
     }
     var box = document.createElement('div');
@@ -1504,7 +1511,15 @@
     haptic();
     render();
   });
-  $('search').addEventListener('input', function () { closeCatMenu(); render(); });
+  var searchTimer = null;
+  $('search').addEventListener('input', function () {
+    closeCatMenu();
+    render();
+    clearTimeout(searchTimer);
+    var text = this.value.trim();
+    if (text.length < 3) return;
+    searchTimer = setTimeout(function () { track('search', text.toLowerCase()); }, 1400);
+  });
   $('search').addEventListener('focus', closeCatMenu);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && catMenuOpen()) closeCatMenu();
@@ -1514,6 +1529,104 @@
   Array.prototype.forEach.call(document.querySelectorAll('input[name=delivery]'), function (r) {
     r.addEventListener('change', updateDeliveryUI);
   });
+
+  // ---------- Счётчик посещений ----------
+  // Копим события и отправляем пачкой. Ни текстов, ни телефонов —
+  // только что открыли, что искали и что положили в корзину.
+
+  var TRACK = {
+    queue: [],
+    seen: {},        // товары, уже засчитанные за этот заход
+    timer: null,
+    who: '',
+    name: '',
+    off: false
+  };
+
+  function trackWho() {
+    var user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+    // id 0 — это просмотр из программы на маке, его не считаем
+    if (user && user.id) return { who: 't' + user.id, name: user.first_name || '' };
+    if (user && user.id === 0) return null;
+    var anon = '';
+    try {
+      anon = localStorage.getItem('mv_who') || '';
+      if (!anon) {
+        anon = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem('mv_who', anon);
+      }
+    } catch (e) { return null; }
+    return { who: anon, name: '' };
+  }
+
+  function track(type, key) {
+    if (TRACK.off) return;
+    TRACK.queue.push({ type: type, key: String(key || '').slice(0, 120) });
+    if (TRACK.queue.length > 120) TRACK.queue.splice(0, TRACK.queue.length - 120);
+    clearTimeout(TRACK.timer);
+    TRACK.timer = setTimeout(flushTrack, 8000);
+  }
+
+  // товар засчитывается просмотренным один раз за заход
+  function trackView(name) {
+    if (!name || TRACK.seen[name]) return;
+    TRACK.seen[name] = true;
+    track('view', name);
+  }
+
+  function flushTrack(final) {
+    if (TRACK.off || !TRACK.queue.length) return;
+    var batch = TRACK.queue.splice(0, 40);
+    clearTimeout(TRACK.timer);
+    try {
+      fetch(CONFIG.SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        keepalive: !!final,
+        body: JSON.stringify({
+          action: 'track',
+          who: TRACK.who,
+          name: TRACK.name,
+          events: batch
+        })
+      }).catch(function () {});
+    } catch (e) {}
+    if (TRACK.queue.length) {
+      TRACK.timer = setTimeout(flushTrack, 2000);
+    }
+  }
+
+  function startTracking() {
+    var id = trackWho();
+    if (!id) { TRACK.off = true; return; }
+    TRACK.who = id.who;
+    TRACK.name = id.name;
+    track('open', S.shop || '');
+    window.addEventListener('pagehide', function () { flushTrack(true); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushTrack(true);
+    });
+  }
+
+  // карточка попала на экран и задержалась — значит, её посмотрели
+  var viewWatcher = (function () {
+    if (typeof IntersectionObserver !== 'function') return null;
+    var timers = new WeakMap();
+    return new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var name = entry.target.getAttribute('data-name');
+        if (entry.isIntersecting) {
+          if (timers.has(entry.target)) return;
+          timers.set(entry.target, setTimeout(function () {
+            trackView(name);
+          }, 900));
+        } else {
+          clearTimeout(timers.get(entry.target));
+          timers.delete(entry.target);
+        }
+      });
+    }, { threshold: 0.5 });
+  })();
 
   // тема берётся из Telegram; если он молчит — из настроек телефона
   function applyTheme() {
