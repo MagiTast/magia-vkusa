@@ -789,6 +789,7 @@
     var raw = '';
     try { raw = localStorage.getItem('mv_favs') || ''; } catch (e) {}
     raw.split(',').filter(Boolean).forEach(function (id) { S.favs[id] = true; });
+    if (pruneFavs()) saveFavs(true);
 
     if (tg && tg.CloudStorage && tg.CloudStorage.getItem) {
       try {
@@ -798,6 +799,7 @@
           String(value).split(',').filter(Boolean).forEach(function (id) {
             if (!S.favs[id]) { S.favs[id] = true; added = true; }
           });
+          pruneFavs();
           if (!added) return;
           saveFavs(true);
           renderSections(S.sections);
@@ -822,9 +824,35 @@
     else S.favs[p.id] = true;
     saveFavs();
     if (button) button.setAttribute('aria-pressed', String(!!S.favs[p.id]));
+
+    // сняли последнее сердечко — вкладка исчезает, и оставаться на ней некуда:
+    // возвращаем покупателя к товарам
+    if (S.fav && !favIds().length) {
+      leaveFavs();
+      return;
+    }
     renderSections(S.sections);
     // в избранном карточка должна исчезнуть сразу
     if (S.fav) render();
+  }
+
+  function leaveFavs() {
+    S.fav = false;
+    S.category = ''; S.brand = ''; S.sub = '';
+    renderSections(S.sections);
+    renderChips();
+    render();
+  }
+
+  // товар могли убрать из каталога — такое сердечко висело бы счётчиком впустую
+  function pruneFavs() {
+    var known = {};
+    S.products.forEach(function (p) { known[p.id] = true; });
+    var dropped = false;
+    favIds().forEach(function (id) {
+      if (!known[id]) { delete S.favs[id]; dropped = true; }
+    });
+    return dropped;
   }
 
   function heartButton(p) {
@@ -858,6 +886,7 @@
     box.innerHTML = '';
     S.sections = sections;
     var favCount = favIds().length;
+    if (!favCount) S.fav = false;
     if (sections.length < 2 && !favCount) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
 
