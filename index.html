@@ -97,11 +97,11 @@
   .card .ribbon.transfer { background: var(--info); color: #fff; }
   .nohere { border: 0; background: var(--line); color: var(--muted); font-weight: 600; padding: 8px 13px; border-radius: 99px; font-size: 14px; }
 
+  /* переносим на вторую строку, а не прячем за краем экрана */
   .sections {
-    display: flex; gap: 2px; background: var(--card); border: 1px solid var(--line);
-    border-radius: 99px; padding: 3px; margin-bottom: 10px; overflow-x: auto; scrollbar-width: none;
+    display: flex; flex-wrap: wrap; gap: 2px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 20px; padding: 3px; margin-bottom: 10px;
   }
-  .sections::-webkit-scrollbar { display: none; }
   .sections button { flex: 0 0 auto; border: 0; background: none; padding: 7px 16px; border-radius: 99px; cursor: pointer; color: var(--muted); font-weight: 500; white-space: nowrap; }
   .sections button[aria-pressed=true] { background: var(--brand); color: var(--on-brand); font-weight: 600; }
 
@@ -250,9 +250,16 @@
   .card .fav[aria-pressed=true] path { fill: currentColor; }
   .card .fav:active { transform: scale(.86); }
 
-  .sections button.favtab { display: flex; align-items: center; gap: 5px; }
-  .sections button.favtab .heart { color: var(--danger); font-size: 13px; }
+  .sections button.favtab { display: flex; align-items: center; gap: 5px; padding-right: 10px; }
+  .sections button.favtab .heart { color: var(--danger); font-size: 13px; line-height: 1; }
   .sections button.favtab[aria-pressed=true] .heart { color: var(--on-brand); }
+  .sections button.favtab .num {
+    min-width: 18px; padding: 0 5px; border-radius: 99px; font-size: 12px; font-weight: 700;
+    background: color-mix(in srgb, var(--danger) 16%, var(--card)); color: var(--danger);
+  }
+  .sections button.favtab[aria-pressed=true] .num {
+    background: color-mix(in srgb, var(--on-brand) 24%, transparent); color: var(--on-brand);
+  }
 
   .card .adult {
     position: absolute; top: 8px; right: 8px; z-index: 1;
@@ -879,9 +886,13 @@
     heart.className = 'heart';
     heart.textContent = '♥';
     var label = document.createElement('span');
-    label.textContent = String(favCount);
+    label.textContent = 'Избранное';
+    var count = document.createElement('span');
+    count.className = 'num';
+    count.textContent = String(favCount);
     tab.appendChild(heart);
     tab.appendChild(label);
+    tab.appendChild(count);
     tab.setAttribute('aria-pressed', String(S.fav));
     tab.setAttribute('aria-label', 'Избранное');
     tab.onclick = function () {
