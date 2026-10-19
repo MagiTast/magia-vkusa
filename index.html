@@ -311,7 +311,22 @@
   .sheet { padding: 16px 16px 0; }
   .sheet h2 { font-size: 20px; margin: 4px 0 14px; }
   .back { background: none; border: 0; color: var(--brand-dark); padding: 6px 0; cursor: pointer; font-weight: 600; }
-  .citem { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .citem { display: grid; grid-template-columns: 56px 1fr auto auto; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .citem .kill {
+    width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+    background: var(--bg); color: var(--muted); cursor: pointer;
+    font-size: 15px; line-height: 1; display: grid; place-items: center;
+    transition: transform .12s ease, color .12s ease;
+  }
+  .citem .kill:active { transform: scale(.88); }
+  @media (hover: hover) { .citem .kill:hover { color: var(--danger); } }
+
+  .carthead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .carthead h2 { margin-bottom: 14px; }
+  .linkbtn {
+    background: none; border: 0; padding: 6px 0; cursor: pointer;
+    color: var(--danger); font-weight: 600; font-size: 14px;
+  }
   .citem .ph { width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--brand) 8%, var(--card)); display: grid; place-items: center; }
   .citem .ph img { width: 100%; height: 100%; object-fit: cover; }
   .citem .nm { font-weight: 600; font-size: 15px; }
@@ -429,7 +444,10 @@
 <!-- ЭКРАН 2: КОРЗИНА -->
 <div id="cartView" class="sheet hidden">
   <button class="back" id="backFromCart" type="button">Назад к каталогу</button>
-  <h2>Корзина</h2>
+  <div class="carthead">
+    <h2>Корзина</h2>
+    <button class="linkbtn" id="clearCart" type="button">Очистить</button>
+  </div>
   <div id="cartItems"></div>
   <div class="total"><span>Итого</span><span id="cartTotal"></span></div>
   <p class="note">Стоимость доставки не входит в сумму — оператор посчитает её и сообщит вам.</p>
@@ -1410,13 +1428,41 @@
       mid.appendChild(nm); mid.appendChild(pr);
 
       row.appendChild(ph); row.appendChild(mid);
-      row.appendChild(controlFor(i));
+      // берём товар из каталога, чтобы в корзине работал предел по остатку
+      var real = productById(i.id);
+      row.appendChild(controlFor(real && real.id ? real : i));
+
+      var kill = document.createElement('button');
+      kill.className = 'kill';
+      kill.type = 'button';
+      kill.textContent = '✕';
+      kill.title = 'Убрать из корзины';
+      kill.setAttribute('aria-label', 'Убрать «' + i.name + '» из корзины');
+      kill.onclick = function () { removeFromCart(i.id); };
+      row.appendChild(kill);
+
       box.appendChild(row);
     });
 
     $('cartTotal').textContent = rub(cartTotal());
     if (!cartList().length) { showView('shop'); return; }
     updateBar();
+  }
+
+  function removeFromCart(id) {
+    haptic();
+    delete S.cart[id];
+    saveCart();
+    if (S.view === 'shop') render(); else renderCart();
+  }
+
+  function clearCart() {
+    if (!cartCount()) return;
+    if (!confirm('Убрать все товары из корзины?')) return;
+    haptic('medium');
+    S.cart = {};
+    saveCart();
+    showView('shop');
   }
 
   // ---------- Экраны ----------
@@ -1433,6 +1479,9 @@
       if (view === 'cart' || view === 'checkout') tg.BackButton.show();
       else tg.BackButton.hide();
     }
+    // каталог перерисовываем всегда: количества в карточках могли измениться
+    // в корзине — или корзину вовсе очистили
+    if (view === 'shop') render();
     if (view === 'cart') renderCart();
     if (view === 'checkout') updateDeliveryUI();
     updateBar();
@@ -1702,6 +1751,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && catMenuOpen()) closeCatMenu();
   });
+  $('clearCart').addEventListener('click', clearCart);
   $('backFromCart').addEventListener('click', function () { showView('shop'); });
   $('backFromCheckout').addEventListener('click', function () { showView('cart'); });
   Array.prototype.forEach.call(document.querySelectorAll('input[name=delivery]'), function (r) {
