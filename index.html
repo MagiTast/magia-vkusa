@@ -235,6 +235,25 @@
     width: 100%; border: 1px solid var(--line); background: none; color: var(--muted);
     border-radius: 14px; padding: 13px; font-size: 15px; cursor: pointer;
   }
+  .card .ph { position: relative; }
+  .card .fav {
+    position: absolute; right: 8px; bottom: 8px; z-index: 2;
+    width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; cursor: pointer; color: var(--muted);
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+    transition: transform .12s ease, color .12s ease;
+  }
+  .card .fav svg { width: 19px; height: 19px; display: block; }
+  .card .fav path { fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .card .fav[aria-pressed=true] { color: var(--danger); }
+  .card .fav[aria-pressed=true] path { fill: currentColor; }
+  .card .fav:active { transform: scale(.86); }
+
+  .sections button.favtab { display: flex; align-items: center; gap: 5px; }
+  .sections button.favtab .heart { color: var(--danger); font-size: 13px; }
+  .sections button.favtab[aria-pressed=true] .heart { color: var(--on-brand); }
+
   .card .adult {
     position: absolute; top: 8px; right: 8px; z-index: 1;
     background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
@@ -526,7 +545,7 @@
   // =========================================================
 
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false, sort: '', brand: '', sub: '' };
+  var S = { categories: [], products: [], points: [], shop: '', section: '', category: '', cart: {}, view: 'shop', sending: false, ageOk: false, sort: '', brand: '', sub: '', sections: [], favs: {}, fav: false };
   var $ = function (id) { return document.getElementById(id); };
   var rub = function (n) { return n.toLocaleString('ru-RU') + ' ₽'; };
 
@@ -559,6 +578,7 @@
           if (sections.indexOf(c.section) === -1 && hasProducts(c.name)) sections.push(c.section);
         });
         S.section = sections[0] || '';
+        loadFavs();
         renderSections(sections);
         renderChips();
         render();
@@ -750,18 +770,98 @@
     e.classList.remove('hidden');
   }
 
+  // ---------- Избранное ----------
+  // Храним на телефоне, а если Telegram даёт своё облако — ещё и там,
+  // чтобы сердечки не пропали при смене устройства.
+
+  function favIds() {
+    return Object.keys(S.favs);
+  }
+
+  function loadFavs() {
+    var raw = '';
+    try { raw = localStorage.getItem('mv_favs') || ''; } catch (e) {}
+    raw.split(',').filter(Boolean).forEach(function (id) { S.favs[id] = true; });
+
+    if (tg && tg.CloudStorage && tg.CloudStorage.getItem) {
+      try {
+        tg.CloudStorage.getItem('favs', function (err, value) {
+          if (err || !value) return;
+          var added = false;
+          String(value).split(',').filter(Boolean).forEach(function (id) {
+            if (!S.favs[id]) { S.favs[id] = true; added = true; }
+          });
+          if (!added) return;
+          saveFavs(true);
+          renderSections(S.sections);
+          render();
+        });
+      } catch (e) {}
+    }
+  }
+
+  function saveFavs(skipCloud) {
+    var ids = favIds().join(',');
+    try { localStorage.setItem('mv_favs', ids); } catch (e) {}
+    if (skipCloud) return;
+    if (tg && tg.CloudStorage && tg.CloudStorage.setItem) {
+      try { tg.CloudStorage.setItem('favs', ids, function () {}); } catch (e) {}
+    }
+  }
+
+  function toggleFav(p, button) {
+    haptic();
+    if (S.favs[p.id]) delete S.favs[p.id];
+    else S.favs[p.id] = true;
+    saveFavs();
+    if (button) button.setAttribute('aria-pressed', String(!!S.favs[p.id]));
+    renderSections(S.sections);
+    // в избранном карточка должна исчезнуть сразу
+    if (S.fav) render();
+  }
+
+  function heartButton(p) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fav';
+    b.setAttribute('aria-pressed', String(!!S.favs[p.id]));
+    b.setAttribute('aria-label', 'В избранное');
+    b.title = 'В избранное';
+
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M12 20.4l-1.3-1.2C6 14.9 3.2 12.3 3.2 9.2 3.2 6.7 5.2 4.7 7.7 4.7c1.4 0 2.8.7 3.6 1.8.8-1.1 2.2-1.8 3.6-1.8 2.5 0 4.5 2 4.5 4.5 0 3.1-2.8 5.7-7.5 10z');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    b.appendChild(svg);
+
+    b.onclick = function (e) {
+      e.stopPropagation();
+      toggleFav(p, b);
+    };
+    return b;
+  }
+
   // ---------- Разделы и категории ----------
   function renderSections(sections) {
     var box = $('sections');
     box.innerHTML = '';
-    if (sections.length < 2) { box.classList.add('hidden'); return; }
+    S.sections = sections;
+    var favCount = favIds().length;
+    if (sections.length < 2 && !favCount) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+
     sections.forEach(function (sec) {
       var b = document.createElement('button');
       b.type = 'button'; b.textContent = sec;
-      b.setAttribute('aria-pressed', String(sec === S.section));
+      b.setAttribute('aria-pressed', String(!S.fav && sec === S.section));
       b.onclick = function () {
         haptic();
         var go = function () {
+          S.fav = false;
           S.section = sec; S.category = ''; S.brand = ''; S.sub = '';
           renderSections(sections); renderChips(); render();
         };
@@ -770,6 +870,27 @@
       };
       box.appendChild(b);
     });
+
+    if (!favCount) return;
+    var tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'favtab';
+    var heart = document.createElement('span');
+    heart.className = 'heart';
+    heart.textContent = '♥';
+    var label = document.createElement('span');
+    label.textContent = String(favCount);
+    tab.appendChild(heart);
+    tab.appendChild(label);
+    tab.setAttribute('aria-pressed', String(S.fav));
+    tab.setAttribute('aria-label', 'Избранное');
+    tab.onclick = function () {
+      haptic();
+      S.fav = !S.fav;
+      S.category = ''; S.brand = ''; S.sub = '';
+      renderSections(sections); renderChips(); render();
+    };
+    box.appendChild(tab);
   }
 
   function categoriesHere() {
@@ -827,6 +948,9 @@
     var cats = categoriesHere();
 
     closeCatMenu();
+
+    // в избранном товары со всех разделов — делить их по категориям незачем
+    if (S.fav) { pick.classList.add('hidden'); S.category = ''; return; }
 
     // в разделе одна категория или ни одной — выбирать не из чего
     if (cats.length < 2) {
@@ -894,6 +1018,12 @@
     var q = $('search').value.trim().toLowerCase();
     return S.products.filter(function (p) {
       if (isAdultProduct(p) && !ageConfirmed()) return false;
+      if (S.fav) {
+        if (!S.favs[p.id]) return false;
+        if (!q) return true;
+        return p.name.toLowerCase().indexOf(q) !== -1
+            || (p.brand && p.brand.toLowerCase().indexOf(q) !== -1);
+      }
       if (S.brand && p.brand !== S.brand) return false;
       if (S.sub && p.subcategory !== S.sub) return false;
       if (q) {
@@ -931,10 +1061,16 @@
     var empty = $('empty');
     if (!items.length) {
       empty.innerHTML = '';
+      var searching = !!$('search').value.trim();
       var h = document.createElement('h2');
-      h.textContent = $('search').value.trim() ? 'Ничего не нашлось' : 'Здесь пока пусто';
       var d = document.createElement('div');
-      d.textContent = $('search').value.trim() ? 'Попробуйте другое слово.' : 'Загляните в другой раздел.';
+      if (S.fav && !searching) {
+        h.textContent = 'В избранном пусто';
+        d.textContent = 'Нажмите сердечко на карточке товара, и он появится здесь.';
+      } else {
+        h.textContent = searching ? 'Ничего не нашлось' : 'Здесь пока пусто';
+        d.textContent = searching ? 'Попробуйте другое слово.' : 'Загляните в другой раздел.';
+      }
       empty.appendChild(h); empty.appendChild(d);
       empty.classList.remove('hidden');
     } else {
@@ -1006,6 +1142,7 @@
 
   function renderBrands() {
     var select = $('brandSelect');
+    if (S.fav) { select.classList.add('hidden'); S.brand = ''; return; }
     var names = brandsHere();
 
     // выбранный бренд пропал из выборки — снимаем фильтр
@@ -1075,6 +1212,7 @@
     } else {
       var s = document.createElement('span'); s.textContent = '🥐'; ph.appendChild(s);
     }
+    ph.appendChild(heartButton(p));
 
     var body = document.createElement('div');
     body.className = 'body';
